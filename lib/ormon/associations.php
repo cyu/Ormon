@@ -33,8 +33,8 @@ class EmbeddedList implements Association {
 
     public function loadData($data) {
         foreach ($data as $v) {
-            if (isset($modelClass)) {
-                $this->data[] = new $modelClass($v);
+            if (isset($this->modelClass)) {
+                $this->data[] = new $this->modelClass($v);
             } else {
                 $this->data[] = $v;
             }

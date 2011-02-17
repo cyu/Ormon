@@ -23,10 +23,6 @@ class DocumentModel extends ormon\DocumentObject {
         return true;
     }
 
-    public function embedsList($name, $modelClass = null) {
-        $this->data[$name] = new ormon\EmbeddedList($modelClass);
-    }
-
     public static function getCollection() {
         $db = Ormon::getDefaultDatabase();
         $collectionName = self::getCollectionName();

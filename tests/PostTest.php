@@ -37,13 +37,19 @@ class PostTest extends PHPUnit_Framework_TestCase {
 
         $id = $post->getId();
         $this->assertTrue(is_a($post->getId(), 'MongoId'));
+
         $found = $post->findOne($id);
-        $comment = $post->comments->first();
+        $this->assertNotNull($found);
+        $this->assertNotNull($found->comments);
+
+        $comment = $found->comments->first();
         $this->assertNotNull($comment);
+        $this->assertTrue(is_a($comment, Comment));
         $this->assertEquals('This is a comment', $comment->text);
 
         $author = $comment->author;
         $this->assertNotNull($author);
+        $this->assertTrue(is_a($author, CommentAuthor));
         $this->assertEquals('Calvin Yu', $author->name);
     }
 
