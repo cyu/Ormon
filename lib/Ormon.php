@@ -26,3 +26,7 @@ class Ormon {
         return "{$s}s";
     }
 }
+
+require_once 'ormon/document.php';
+require_once 'ormon/associations.php';
+

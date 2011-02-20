@@ -1,13 +1,13 @@
 <?php
 
-require_once 'DocumentModel.php';
+require_once 'Ormon.php';
 
 Ormon::setMongo(new Mongo());
 Ormon::setDefaultDatabaseName('ormon');
 
-class Post extends DocumentModel {
-
+class Post extends ormon\DocumentModel {
     public function __construct(array $data = null) {
+        $this->embedsObject('author', Author);
         $this->embedsList('comments', Comment);
         parent::__construct($data);
     }
@@ -16,9 +16,9 @@ class Post extends DocumentModel {
 class Comment extends ormon\EmbeddedDocument {
 
     public function __construct(array $data = null) {
-        $this->embedsObject('author', CommentAuthor);
+        $this->embedsObject('author', Author);
         parent::__construct($data);
     }
 }
 
-class CommentAuthor extends ormon\EmbeddedDocument {}
+class Author extends ormon\EmbeddedDocument {}

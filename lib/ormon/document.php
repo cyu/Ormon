@@ -8,6 +8,7 @@ interface DocumentNode {
 
 class DocumentObject implements DocumentNode {
     protected $data = array();
+    protected $dirty;
 
     public function __construct(array $data = null) {
         if (isset($data)) $this->loadData($data);
@@ -23,13 +24,14 @@ class DocumentObject implements DocumentNode {
 
     public function __set($name, $value) {
         $this->data[$name] = $value;
+        $this->dirty[] = $name;
     }
 
     public function __toString() {
         return json_encode($this->asDoc());
     }
 
-    public function loadData($data) {
+    public function loadData(array $data) {
         foreach ($data as $k => $v) {
             if (isset($this->data[$k])) {
                 $cur = $this->data[$k];
@@ -68,6 +70,23 @@ class DocumentObject implements DocumentNode {
         return $doc;
     }
 
+    public function applyUpdates(DocumentUpdates $updates) {
+        if (isset($this->dirty)) {
+            foreach ($this->dirty as $name) {
+                if (isset($this->data[$name])) {
+                    $value = $this->data[$name];
+                    if ($value instanceof Association) {
+                        $value->applyUpdates($updates);
+                    } else {
+                        $updates->set($name, $value);
+                    }
+                } else {
+                    $updates->unset_value($name);
+                }
+            }
+        }
+    }
+
     public static function asDocValue($v) {
         if (is_object($v)) {
             if ($v instanceof DocumentNode) return $v->asDoc();
@@ -98,5 +117,97 @@ class ObjectPlaceholder {
 
     public function getModelClass() {
         return $this->modelClass;
+    }
+}
+
+class DocumentModel extends DocumentObject {
+    private static $collectionNames = array();
+
+    private $fieldProjection = false;
+
+    public function getId() {
+        return $this->_id;
+    }
+
+    public function save() {
+        $doc = $this->asDoc();
+
+        if (empty($doc)) {
+            return false;
+        }
+
+        if (isset($doc['_id'])) {
+            $docId = $doc['_id'];
+
+            if ($this->fieldProjection) {
+                // project used, don't do a full doc update.
+                $updates = new DocumentUpdates();
+                $this->applyUpdates($updates);
+                $data = $updates->data;
+
+            } else {
+                unset($doc['_id']);
+                $data = $doc;
+            }
+
+            if (!empty($data)) {
+                self::getCollection()->update(array('_id' => $docId), $data);
+            }
+        } else {
+            self::getCollection()->insert($doc);
+            $this->data['_id'] = $doc['_id'];
+        }
+        return true;
+    }
+
+    public static function getCollection() {
+        $db = \Ormon::getDefaultDatabase();
+        $collectionName = self::getCollectionName();
+        return $db->$collectionName;
+    }
+
+    public static function getCollectionName() {
+        $className = get_called_class();
+        if (!isset(self::$collectionNames[$className])) {
+            $collectionName = \Ormon::collectionize($className);
+            self::$collectionNames[$className] = $collectionName;
+        } else {
+            $collectionName = self::$collectionNames[$className];
+        }
+        return $collectionName;
+    }
+
+    public static function findOne($criteria = array(), $fields = array()) {
+        if ( !is_array($criteria) ) {
+            $criteria = array('_id' => $criteria);
+        }
+        $doc = self::getCollection()->findOne($criteria, $fields);
+        if (!empty($doc)) {
+            $DocumentClass = get_called_class();
+            $document = new $DocumentClass();
+            $document->fieldProjection = !empty($fields);
+            $document->loadData($doc);
+        }
+        return $document;
+    }
+}
+
+class DocumentUpdates {
+    public $data = array();
+
+    public function set($name, $value) {
+        $this->op('set', $name, $value);
+    }
+    public function unset_value($name) {
+        $this->op('unset', $name, 1);
+    }
+
+    private function op($op, $name, $value) {
+        $op = '$'.$op;
+        if (isset($this->data[$op])) {
+            $this->data[$op][$name] = $value;
+        } else {
+            $this->data[$op] = array($name => $value);
+        }
     }
 }

@@ -3,7 +3,8 @@
 namespace ormon;
 
 interface Association extends DocumentNode  {
-    public function loadData($data);
+    public function applyUpdates(DocumentUpdates $updates);
+    public function loadData(array $data);
 }
 
 class EmbeddedList implements Association {
@@ -14,12 +15,34 @@ class EmbeddedList implements Association {
         $this->modelClass = $modelClass;
     }
 
+    public function __isset($name) {
+        if ($name == 'count' ||
+                ($name == 'first' && !empty($this->data))) {
+            return true;
+        }
+    }
+
+    public function __get($name) {
+        if ($name == 'first') {
+            return empty($this->data) ? null : $this->data[0];
+        }
+        if ($name == 'count') {
+            return count($this->data);
+        }
+    }
+
     public function push($value) {
         $this->data[] = $value;
     }
 
-    public function first() {
-        return $this->data[0];
+    public function get($index) {
+        return $this->data[$index];
+    }
+
+    public function applyUpdates(DocumentUpdates $updates) {
+        foreach ($this->data as $val) {
+            
+        }
     }
 
     public function asDoc() {
@@ -31,10 +54,14 @@ class EmbeddedList implements Association {
         return empty($doc) ? null : $doc;
     }
 
-    public function loadData($data) {
+    public function loadData(array $data) {
         foreach ($data as $v) {
             if (isset($this->modelClass)) {
-                $this->data[] = new $this->modelClass($v);
+                if ($v instanceof $this->modelClass) {
+                    $this->data[] = $v;
+                } else {
+                    $this->data[] = new $this->modelClass($v);
+                }
             } else {
                 $this->data[] = $v;
             }
