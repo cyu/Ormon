@@ -8,7 +8,7 @@ interface DocumentNode {
 
 class DocumentObject implements DocumentNode {
     protected $data = array();
-    protected $dirty;
+    public $dirty;
 
     public function __construct(array $data = null) {
         if (isset($data)) $this->loadData($data);
@@ -23,8 +23,33 @@ class DocumentObject implements DocumentNode {
     }
 
     public function __set($name, $value) {
-        $this->data[$name] = $value;
-        $this->dirty[] = $name;
+        if (isset($this->data[$name])) {
+            $cur = $this->data[$name];
+
+            if (is_object($cur) && ($cur instanceof Association)) {
+                $cur->loadData($value);
+
+            } else if (is_object($cur) && ($cur instanceof ObjectPlaceholder)) {
+                if (is_object($value)) {
+                    $modelClass = $cur->getModelClass();
+                    if ($value instanceof $modelClass) {
+                        $this->data[$name] = $value;
+                    }
+                } else {
+                    $obj = $cur->create();
+                    $obj->loadData($value);
+                    $this->data[$name] = $obj;
+                }
+
+            } else {
+                $this->data[$name] = $value;
+                $this->dirty[] = $name;
+            }
+
+        } else {
+            $this->data[$name] = $value;
+            $this->dirty[] = $name;
+        }
     }
 
     public function __toString() {
@@ -33,32 +58,9 @@ class DocumentObject implements DocumentNode {
 
     public function loadData(array $data) {
         foreach ($data as $k => $v) {
-            if (isset($this->data[$k])) {
-                $cur = $this->data[$k];
-
-                if (is_object($cur) && ($cur instanceof Association)) {
-                    $cur->loadData($v);
-
-                } else if (is_object($cur) && ($cur instanceof ObjectPlaceholder)) {
-                    if (is_object($v)) {
-                        $modelClass = $cur->getModelClass();
-                        if ($v instanceof $modelClass) {
-                            $this->data[$k] = $v;
-                        }
-                    } else {
-                        $obj = $cur->create();
-                        $obj->loadData($v);
-                        $this->data[$k] = $obj;
-                    }
-
-                } else {
-                    $this->data[$k] = $v;
-                }
-
-            } else {
-                $this->data[$k] = $v;
-            }
+            $this->$k = $v;
         }
+        $this->dirty = null;
     }
 
     public function asDoc() {
@@ -74,15 +76,16 @@ class DocumentObject implements DocumentNode {
         if (isset($this->dirty)) {
             foreach ($this->dirty as $name) {
                 if (isset($this->data[$name])) {
-                    $value = $this->data[$name];
-                    if ($value instanceof Association) {
-                        $value->applyUpdates($updates);
-                    } else {
-                        $updates->set($name, $value);
-                    }
+                    $updates->set($name, $this->data[$name]);
                 } else {
                     $updates->unset_value($name);
                 }
+            }
+        }
+
+        foreach ($this->data as $name => $value) {
+            if ($value instanceof Association) {
+                $value->applyUpdates($updates);
             }
         }
     }

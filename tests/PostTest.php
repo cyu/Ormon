@@ -67,6 +67,17 @@ class PostTest extends PHPUnit_Framework_TestCase {
         $this->assertEquals('billy.shakes@example.com', $post->author->email);
     }
 
+    public function testSettingEmbeddedObject() {
+        $post = new Post();
+        $post->author = new Author(array('name' => 'joe commenter'));
+        $this->assertInstanceOf(Author, $post->author);
+        $this->assertEquals('joe commenter', $post->author->name);
+
+        $post->author = array('name' => 'joe commenter');
+        $this->assertInstanceOf(Author, $post->author);
+        $this->assertEquals('joe commenter', $post->author->name);
+    }
+
     public function testSaveWithEmbeddedList() {
         $post = new Post(array(
             'comments' => array(
